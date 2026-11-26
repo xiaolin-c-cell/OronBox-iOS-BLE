@@ -26,7 +26,7 @@ class DeviceProfile {
   bool matches(String name) => namePattern.hasMatch(name);
 }
 
-const _xiaomiProfile = DeviceProfile(
+final _xiaomiProfile = DeviceProfile(
   id: 'xiaomi-vela',
   kind: DeviceKind.xiaomi,
   namePattern: RegExp(
@@ -38,7 +38,7 @@ const _xiaomiProfile = DeviceProfile(
   attemptPair: true,
 );
 
-const _zeppProfile = DeviceProfile(
+final _zeppProfile = DeviceProfile(
   id: 'zeppos',
   kind: DeviceKind.zepp,
   namePattern: RegExp(
@@ -53,7 +53,7 @@ const _zeppProfile = DeviceProfile(
   attemptPair: false,
 );
 
-const List<DeviceProfile> deviceProfiles = [_xiaomiProfile, _zeppProfile];
+final List<DeviceProfile> deviceProfiles = [_xiaomiProfile, _zeppProfile];
 
 /// 按设备名匹配画像；未知设备默认按小米 BLE 处理（iOS 无 SPP 可退）。
 DeviceProfile profileFor(String name) {
