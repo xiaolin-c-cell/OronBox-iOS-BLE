@@ -1,0 +1,98 @@
+name: Build OronBox BLE for iOS (IPA)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: "3.47.5"
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter config & pub get
+        run: |
+          flutter config --no-analytics
+          flutter --version
+          flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      - name: Build iOS (no codesign)
+        run: |
+          set -uo pipefail
+          flutter build ios --release --no-codesign || echo "::warning:: flutter build non-zero, verifying artifacts"
+          APP="$(find build/ios -name "Runner.app" -type d | head -n1 || true)"
+          OK=0
+          if [ -n "$APP" ]; then
+            BIN_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP/Info.plist" 2>/dev/null || echo Runner)"
+            if [ -f "$APP/$BIN_NAME" ] && [ -d "$APP/Frameworks" ] && [ -d "$APP/flutter_assets" ]; then
+              OK=1
+            fi
+          fi
+          if [ "$OK" != "1" ]; then
+            echo "::warning:: fallback: direct xcodebuild with signing disabled"
+            xcodebuild \
+              -workspace ios/Runner.xcworkspace \
+              -scheme Runner \
+              -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -derivedDataPath build/xcode-direct \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              EXPANDED_CODE_SIGN_IDENTITY="" \
+              ENABLE_BITCODE=NO \
+              build 2>&1 | tail -200
+            APP="$(find build/xcode-direct -name "Runner.app" -type d | head -n1 || true)"
+          fi
+          if [ -z "$APP" ]; then
+            echo "::error:: Runner.app not found"
+            exit 1
+          fi
+          printf '%s' "$APP" > .app_path
+
+      - name: Ad-hoc sign & package IPA
+        run: |
+          set -euo pipefail
+          APP="$(cat .app_path)"
+          rm -rf Payload && mkdir -p Payload
+          cp -r "$APP" Payload/
+          codesign --force --sign - Payload/Runner.app || codesign --force --deep --sign - Payload/Runner.app
+          zip -qry OronBox-BLE-iOS.ipa Payload
+          ls -lh OronBox-BLE-iOS.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OronBox-BLE-iOS-ipa
+          path: OronBox-BLE-iOS.ipa
+          if-no-files-found: error
+
+      - name: Publish to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-ble-v1.3.0
+          name: "OronBox for iOS · BLE v1.3.0"
+          body: |
+            OronBox for iOS — 纯 BLE 版本（基于上游 v1.3.0 协议）
+            - 强制 BLE GATT（iOS CoreBluetooth），无 SPP
+            - 小米 VelaOS + Amazfit ZeppOS 全场景连接协议
+            - Ad-hoc 签名，可侧载安装（TrollStore / 巨魔）
+          files: OronBox-BLE-iOS.ipa
+          generate_release_notes: false
