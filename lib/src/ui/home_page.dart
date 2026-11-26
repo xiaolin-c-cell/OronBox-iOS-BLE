@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:universal_ble/universal_ble.dart';
 
 import '../ble/ble_connection.dart';
 import '../ble/ble_uuids.dart';
@@ -376,7 +375,7 @@ class _HomePageState extends State<HomePage> {
               child: Icon(
                 profile.kind == DeviceKind.zepp
                     ? Icons.watch
-                    : Icons.smartband,
+                    : Icons.fitness_center,
                 color: profile.kind == DeviceKind.zepp
                     ? Colors.deepPurple
                     : Colors.blue,
